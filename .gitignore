@@ -1,0 +1,7 @@
+.build/
+.swiftpm/
+dist/
+.codex/
+*.xcresult/
+*.xcuserdata/
+.DS_Store
