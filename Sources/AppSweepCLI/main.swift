@@ -832,12 +832,11 @@ func globalFindMatches(patterns: [String], generic: Bool, full: Bool = false, li
         FindRootSpec(path: "/tmp", maxDepth: 3, timeoutSeconds: 10),
         FindRootSpec(path: "/etc", maxDepth: 3, timeoutSeconds: 10)
     ]
+    let appSweepSupport = NSHomeDirectory() + "/Library/Application Support/App Sweep"
     let excludes = [
-        NSHomeDirectory() + "/App Sweep/backups",
-        NSHomeDirectory() + "/App Sweep/reports",
+        appSweepSupport + "/backups",
         NSHomeDirectory() + "/.Trash",
-        "/System/Volumes/Data" + NSHomeDirectory() + "/App Sweep/backups",
-        "/System/Volumes/Data" + NSHomeDirectory() + "/App Sweep/reports",
+        "/System/Volumes/Data" + appSweepSupport + "/backups",
         "/System/Volumes/Data" + NSHomeDirectory() + "/.Trash",
         "/dev",
         "/Volumes",

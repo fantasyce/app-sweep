@@ -65,12 +65,6 @@ struct StatusBarView: View {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .textSelection(.enabled)
-            } else if let lastReportURL = store.lastReportURL {
-                Text(AppFormatters.shortPath(lastReportURL.path))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .textSelection(.enabled)
             }
         }
         .padding(.horizontal, 12)

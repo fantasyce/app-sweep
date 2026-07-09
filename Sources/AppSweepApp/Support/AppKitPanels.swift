@@ -18,7 +18,7 @@ enum AppKitPanels {
     }
 
     @MainActor
-    static func chooseBackupReport() -> URL? {
+    static func chooseBackupReport(defaultDirectory: URL) -> URL? {
         let panel = NSOpenPanel()
         panel.title = "Choose a backup report"
         panel.prompt = "Restore"
@@ -26,8 +26,7 @@ enum AppKitPanels {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.allowedContentTypes = [.json]
-        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("App Sweep/reports")
+        panel.directoryURL = defaultDirectory
 
         guard panel.runModal() == .OK else { return nil }
         return panel.url

@@ -11,7 +11,6 @@ final class UninstallerStore: ObservableObject {
     @Published var statusMessage = "Ready"
     @Published var errorMessage: String?
     @Published var logLines: [String] = []
-    @Published var lastReportURL: URL?
     @Published var backupRootURL: URL
     @Published var backupItems: [BackupItem] = []
     @Published var lastBackupDirectory: URL?
@@ -75,7 +74,6 @@ final class UninstallerStore: ObservableObject {
         run("Scanning \(selectedApp.name)") {
             let result = try await self.cli.scan(appPath: selectedApp.path)
             self.scanReport = result.report
-            self.lastReportURL = result.reportURL
             self.statusMessage = "Scan complete: \(result.report.summary.existingCandidates) existing candidates"
             self.appendCLIOutput(result.stdout, result.stderr)
         }
@@ -86,7 +84,6 @@ final class UninstallerStore: ObservableObject {
         run("Running full audit for \(selectedApp.name)") {
             let result = try await self.cli.audit(appPath: selectedApp.path, full: true)
             self.auditReport = result.report
-            self.lastReportURL = result.reportURL
             self.statusMessage = "Full audit complete: \(result.report.summary.strongPathMatchCount) strong matches"
             self.appendCLIOutput(result.stdout, result.stderr)
         }
@@ -98,7 +95,6 @@ final class UninstallerStore: ObservableObject {
             let backupRoot = self.defaultBackupRoot()
             let result = try await self.cli.backup(appPath: selectedApp.path, backupRoot: backupRoot)
             self.scanReport = result.report
-            self.lastReportURL = result.reportURL
             self.handleBackupLocations(from: result.report, fallbackRoot: backupRoot)
             self.statusMessage = "Backup complete: \(result.report.candidates.filter { $0.status == .backedUp }.count) items"
             self.appendCLIOutput(result.stdout, result.stderr)
@@ -114,7 +110,6 @@ final class UninstallerStore: ObservableObject {
                 backupRoot: backupRoot
             )
             self.scanReport = result.report
-            self.lastReportURL = result.reportURL
             if let backupRoot {
                 self.handleBackupLocations(from: result.report, fallbackRoot: backupRoot)
             }
@@ -125,11 +120,10 @@ final class UninstallerStore: ObservableObject {
     }
 
     func chooseAndRestoreBackupReport() {
-        guard let url = AppKitPanels.chooseBackupReport() else { return }
+        guard let url = AppKitPanels.chooseBackupReport(defaultDirectory: backupRootURL) else { return }
         run("Restoring from \(url.lastPathComponent)") {
             let result = try await self.cli.restore(reportPath: url.path)
             self.restoreReport = result.report
-            self.lastReportURL = result.reportURL
             self.statusMessage = "Restore complete: \(result.report.summary.restored) restored"
             self.appendCLIOutput(result.stdout, result.stderr)
             self.refreshApps()
@@ -241,12 +235,15 @@ final class UninstallerStore: ObservableObject {
     }
 
     private static func defaultBackupRootURL() -> URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
+        return applicationSupport
             .appendingPathComponent("App Sweep/backups/gui", isDirectory: true)
     }
 
     private func handleBackupLocations(from report: Report, fallbackRoot: URL) {
         let backupDirectories = extractBackupDirectories(from: report)
+        writeBackupReports(report, to: backupDirectories)
         if let path = backupDirectories.first {
             let url = URL(fileURLWithPath: path)
             lastBackupDirectory = url
@@ -255,6 +252,25 @@ final class UninstallerStore: ObservableObject {
             appendLog("Backup root: \(fallbackRoot.path)")
         }
         refreshBackups(log: false)
+    }
+
+    private func writeBackupReports(_ report: Report, to backupDirectories: [String]) {
+        guard !backupDirectories.isEmpty else { return }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+        do {
+            let data = try encoder.encode(report)
+            for path in backupDirectories {
+                let directoryURL = URL(fileURLWithPath: path)
+                let reportURL = directoryURL.appendingPathComponent("backup-report.json")
+                try data.write(to: reportURL, options: .atomic)
+                appendLog("Backup report: \(reportURL.path)")
+            }
+        } catch {
+            appendLog("ERROR: Failed to write backup report: \(error.localizedDescription)")
+        }
     }
 
     private func extractBackupDirectories(from report: Report) -> [String] {

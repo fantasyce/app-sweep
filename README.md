@@ -59,7 +59,7 @@ The app UI supports:
 - backup;
 - uninstall with explicit confirmation and backup-first option;
 - restore from a backup JSON report;
-- logs and latest report path.
+- logs and latest backup location.
 
 ## Commands
 

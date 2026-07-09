@@ -20,7 +20,6 @@ enum CLIServiceError: LocalizedError {
 
 struct CLIResult<ReportType: Sendable>: Sendable {
     let report: ReportType
-    let reportURL: URL
     let stdout: String
     let stderr: String
 }
@@ -85,7 +84,7 @@ struct CLIService {
     }
 
     private func run<T: Decodable & Sendable>(_ args: [String], reportPrefix: String) async throws -> CLIResult<T> {
-        let reportURL = try makeReportURL(prefix: reportPrefix)
+        let reportURL = temporaryOutputURL(prefix: "report-\(reportPrefix)")
         var finalArgs = args
         finalArgs += ["--json", reportURL.path]
 
@@ -113,6 +112,7 @@ struct CLIService {
                     defer {
                         try? FileManager.default.removeItem(at: stdoutURL)
                         try? FileManager.default.removeItem(at: stderrURL)
+                        try? FileManager.default.removeItem(at: reportURL)
                     }
 
                     let stdoutText = (try? String(contentsOf: stdoutURL)) ?? ""
@@ -136,7 +136,6 @@ struct CLIService {
                     let report = try JSONDecoder().decode(T.self, from: data)
                     continuation.resume(returning: CLIResult(
                         report: report,
-                        reportURL: reportURL,
                         stdout: stdoutText,
                         stderr: stderrText
                     ))
@@ -145,13 +144,6 @@ struct CLIService {
                 }
             }
         }
-    }
-
-    private func makeReportURL(prefix: String) throws -> URL {
-        let root = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("App Sweep/reports/gui-\(AppFormatters.timestampSlug())", isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        return root.appendingPathComponent("\(prefix)-\(UUID().uuidString.prefix(8)).json")
     }
 
     private func temporaryOutputURL(prefix: String) -> URL {

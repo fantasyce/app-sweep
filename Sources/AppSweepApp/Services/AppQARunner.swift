@@ -14,7 +14,6 @@ struct AppQASummary: Codable, Sendable {
     let auditAfterStrongMatches: Int
     let auditAfterRegistrationMatches: Int
     let auditAfterUnreadableErrors: Int
-    let reportPaths: [String: String]
     let verdict: String
 }
 
@@ -69,7 +68,6 @@ enum AppQARunner {
         }
         let backupReportPath = value(after: "--backup-report", in: arguments)
         let cli = try CLIService()
-        var reports: [String: String] = [:]
         var restored: RestoreSummary?
 
         if !FileManager.default.fileExists(atPath: appPath) {
@@ -78,26 +76,20 @@ enum AppQARunner {
             }
             let restore = try await cli.restore(reportPath: backupReportPath)
             restored = restore.report.summary
-            reports["restore"] = restore.reportURL.path
         }
 
         let scanBefore = try await cli.scan(appPath: appPath)
-        reports["scanBefore"] = scanBefore.reportURL.path
 
         let app = scanBefore.report.app
-        let backupRoot = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("App Sweep/backups/app-qa-\(AppFormatters.timestampSlug())", isDirectory: true)
+        let backupRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("app-sweep-qa-backups-\(AppFormatters.timestampSlug())", isDirectory: true)
         let backup = try await cli.backup(appPath: appPath, backupRoot: backupRoot)
-        reports["backup"] = backup.reportURL.path
 
         let uninstall = try await cli.uninstall(appPath: appPath, backupRoot: nil)
-        reports["uninstall"] = uninstall.reportURL.path
 
         let scanAfter = try await cli.scanKnown(bundleIdentifier: app.bundleIdentifier, appName: app.displayName)
-        reports["scanAfter"] = scanAfter.reportURL.path
 
         let auditAfter = try await cli.auditKnown(bundleIdentifier: app.bundleIdentifier, appName: app.displayName, full: false)
-        reports["auditAfter"] = auditAfter.reportURL.path
 
         let backupFailed = backup.report.candidates.filter { $0.status == .backupFailed }.count
         let uninstallTrashed = uninstall.report.candidates.filter { $0.status == .trashed }.count
@@ -119,7 +111,6 @@ enum AppQARunner {
             auditAfterStrongMatches: auditAfter.report.summary.strongPathMatchCount,
             auditAfterRegistrationMatches: auditAfter.report.summary.registrationMatchCount,
             auditAfterUnreadableErrors: auditAfter.report.summary.unreadableErrorCount,
-            reportPaths: reports,
             verdict: verdict
         )
     }
@@ -128,8 +119,8 @@ enum AppQARunner {
         if let value = value(after: "--out", in: args) {
             return NSString(string: value).expandingTildeInPath
         }
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("App Sweep/reports/app-qa-\(AppFormatters.timestampSlug()).json")
+        return FileManager.default.temporaryDirectory
+            .appendingPathComponent("app-sweep-qa-\(AppFormatters.timestampSlug()).json")
             .path
     }
 
