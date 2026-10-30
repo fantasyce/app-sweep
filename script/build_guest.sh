@@ -51,6 +51,7 @@ done
 cp "$SOURCE/Sources/AppSweepAppV2/Resources/Yozai-Regular.ttf" "$APP/Contents/Resources/"
 cp "$SOURCE/Sources/AppSweepAppV2/Resources/OFL-Yozai.txt" "$APP/Contents/Resources/"
 cp "$SOURCE/LICENSE" "$APP/Contents/Resources/LICENSE-AppSweep.txt"
+cp "$SOURCE/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
 cp "$SOURCE/Assets/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
