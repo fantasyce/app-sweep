@@ -14,6 +14,7 @@ jobs:
         shell: bash
         run: |
           test_output=$(mktemp -d "$RUNNER_TEMP/app-sweep-ci.XXXXXX")
+          chmod 0777 "$test_output" # Ephemeral CI output, writable without DAC override.
           docker run --rm --read-only --network none --cap-drop ALL --security-opt no-new-privileges \
             --cpus 2 --memory 4g --pids-limit 256 --tmpfs /tmp:rw,exec,size=1g \
             --tmpfs /root/.cache:rw,exec,size=1g --tmpfs /root/.swiftpm:rw,size=128m \
@@ -22,7 +23,7 @@ jobs:
             --mount "type=bind,src=$test_output,dst=/out" -w /src \
             swift:6.0.3-jammy swift test -j 2 --scratch-path /out/build
   macos-compile-only:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
       - name: Compile without launching the product
