@@ -84,7 +84,9 @@ final class UserOwnershipInventoryTests: XCTestCase {
 
     func testSystemInventoryDoesNotCallUserIndexOrOpenUserHome() throws {
         #if os(macOS)
-        let result = try AppInspector.inventorySnapshot(home: "/nonexistent-unreadable-user-home", indexLookup: { _ in
+        let fixture = try RecoveryTests.Fixture(); defer { try? fixture.clean() }
+        XCTAssertNil(try AppInspector.fixtureMachineApplicationsRoot(home: SystemIdentity.home()))
+        let result = try AppInspector.inventorySnapshot(home: fixture.home + "/nonexistent-unreadable-user-home", indexLookup: { _ in
             XCTFail("System inventory must never query the user's index")
             throw SweepError.denied("User index must not run")
         }, machineOnly: true)

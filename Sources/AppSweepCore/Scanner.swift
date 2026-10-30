@@ -186,12 +186,31 @@ enum AppInspector {
         // Actual bundle metadata and unknown/link access still require inspection.
         return try !SafeFilesystem.presence(path + "/Contents") && !SafeFilesystem.presence(path + "/Info.plist")
     }
+    #if DEBUG
+    // Test-only installation scope. Release builds always inspect /Applications.
+    static func fixtureMachineApplicationsRoot(home: String) throws -> String? {
+        let environment = ProcessInfo.processInfo.environment
+        guard let base = environment["APP_SWEEP_FIXTURES"],
+              let path = environment["APP_SWEEP_TEST_MACHINE_APPLICATIONS"],
+              base != "/", base != (try SystemIdentity.home()),
+              SafetyPolicy.contains(base, home), path == base + "/MachineApplications" else { return nil }
+        let directory = try SafeDirectory(path: path)
+        guard try directory.ownIdentity.owner == as_current_uid() else {
+            throw SweepError.denied("Installation test scope is not owned by the test user")
+        }
+        return path
+    }
+    #endif
     static func inventorySnapshot(home: String, selectedApplication: String? = nil, ownershipIdentifier: String? = nil, registryLookup: ApplicationRegistry.Lookup = ApplicationRegistry.systemLocations, indexLookup: ApplicationIndex.Lookup = ApplicationIndex.systemPaths, machineOnly: Bool = false, retainedApplication: String? = nil) throws -> ApplicationInventory {
         var result: [ApplicationIdentity] = [], issues: [String] = []
         let deadline = Date().addingTimeInterval(30)
         var visited = 0
         var entryBuffer = [UInt8](repeating:0,count:2*1024*1024)
-        var roots: [(String, String?)] = machineOnly ? [("/Applications", nil)] : [("/Applications", nil), (home + "/Applications", nil)]
+        var machineApplications = "/Applications"
+        #if DEBUG
+        machineApplications = try fixtureMachineApplicationsRoot(home: home) ?? machineApplications
+        #endif
+        var roots: [(String, String?)] = machineOnly ? [(machineApplications, nil)] : [(machineApplications, nil), (home + "/Applications", nil)]
         // This bounded subtree is for retained component hints only. It is not
         // an exclusive-owner inventory and must never authorize data cleanup.
         if let retainedApplication {
