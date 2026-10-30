@@ -265,7 +265,7 @@ struct SweepWindow: View {
                         Button("先核对独占系统组件…") { store.reviewUninstallPrerequisites() }
                             .buttonStyle(.link).font(SketchFont.body(13)).disabled(store.busy)
                     }
-                    Toggle("同时清理用户数据", isOn: Binding(get: { store.includeUserData }, set: store.toggleData))
+                    Toggle("同时清理用户数据", isOn: Binding(get: { store.includeUserData }, set: { store.toggleData($0) }))
                         .toggleStyle(SketchCheckbox()).font(SketchFont.body(13)).disabled(store.busy)
                         .help("仅包含归属已确认且符合规则的资料、设置和容器。钥匙串及共享资源始终保留。")
                     CandidateList(report: report, showsCategorySidebar: false).environmentObject(store)

@@ -43,7 +43,7 @@ struct CandidateList<Report: CandidatePresentation>: View {
                 VStack(alignment: .leading, spacing: 12) {
                     toolbar(projection, selected: category, proxy: proxy)
                     if store.workspace == .junk && report.candidates.contains(where: \.userData) {
-                        Toggle("允许选择个人资料", isOn: Binding(get: { store.includeUserData }, set: store.toggleData))
+                        Toggle("允许选择个人资料", isOn: Binding(get: { store.includeUserData }, set: { store.toggleData($0) }))
                             .toggleStyle(SketchCheckbox()).font(SketchFont.body(13)).disabled(store.busy)
                             .help("开启后仍需逐项选择。备份、文稿历史和模型等个人资料不会自动勾选。")
                     }

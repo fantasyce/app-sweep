@@ -6,22 +6,15 @@ on:
 permissions:
   contents: read
 jobs:
-  portable-safety:
-    runs-on: ubuntu-latest
+  native-safety:
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
-      - name: Portable core tests in isolated container
+      - name: Core tests with disposable fixtures
         shell: bash
         run: |
-          test_output=$(mktemp -d "$RUNNER_TEMP/app-sweep-ci.XXXXXX")
-          docker run --rm --user "$(id -u):$(id -g)" --read-only --network none --cap-drop ALL --security-opt no-new-privileges \
-            --cpus 2 --memory 4g --pids-limit 256 --tmpfs /tmp:rw,exec,size=1g \
-            --tmpfs "/root:rw,exec,size=1g,mode=700,uid=$(id -u),gid=$(id -g)" \
-            --tmpfs /fixture-home:rw,exec,size=128m -e APP_SWEEP_FIXTURES=/fixture-home/task \
-            -e HOME=/root -e XDG_CACHE_HOME=/root/.cache -e CLANG_MODULE_CACHE_PATH=/root/.cache/clang \
-            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/src,readonly" \
-            --mount "type=bind,src=$test_output,dst=/out" -w /src \
-            swift:6.0.3-jammy swift test -j 2 --scratch-path /out/build
+          export APP_SWEEP_FIXTURES="$(mktemp -d "$RUNNER_TEMP/app-sweep-fixtures.XXXXXX")"
+          swift test -j 2
   macos-compile-only:
     runs-on: macos-26
     steps:
