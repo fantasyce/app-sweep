@@ -54,7 +54,10 @@ final class CacheDiscoveryTests: XCTestCase, @unchecked Sendable {
         let result=try scan(f)
         XCTAssertFalse(result.report.complete,"A cache discovery root failure must not appear as an empty successful scan")
         XCTAssertTrue(result.report.issues.contains { $0.contains(root) })
-        XCTAssertFalse(result.report.candidates.contains { $0.path.hasPrefix(root + "/") })
+        // Fixed-path rules may report a blocked location without enumerating it.
+        let retained = result.report.candidates.filter { $0.path.hasPrefix(root + "/") }
+        XCTAssertTrue(retained.allSatisfy { !$0.allowed && !$0.selectedByDefault && $0.identity == nil && result.snapshots[$0.id] == nil })
+        XCTAssertFalse(result.report.candidates.contains { $0.path == root + "/org.example.fixture/data" })
         XCTAssertEqual(try String(contentsOfFile:saved + "/org.example.fixture/data",encoding:.utf8),"regenerable")
     }
     func testMissingCacheRootAndDeniedCacheRootHaveDifferentResults() throws {

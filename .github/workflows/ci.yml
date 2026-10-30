@@ -14,7 +14,9 @@ jobs:
       - name: Core tests with disposable fixtures
         shell: bash
         run: |
-          export APP_SWEEP_FIXTURES="$(mktemp -d "$RUNNER_TEMP/app-sweep-fixtures.XXXXXX")"
+          test_output=$(mktemp -d "$RUNNER_TEMP/app-sweep-ci.XXXXXX")
+          export APP_SWEEP_FIXTURES="$test_output/Fixtures.noindex"
+          mkdir -m 700 "$APP_SWEEP_FIXTURES"
           export APP_SWEEP_TEST_MACHINE_APPLICATIONS="$APP_SWEEP_FIXTURES/MachineApplications"
           mkdir -m 700 "$APP_SWEEP_TEST_MACHINE_APPLICATIONS"
           export APP_SWEEP_CLANG="$(xcrun --find clang)"
