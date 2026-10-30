@@ -14,10 +14,9 @@ jobs:
         shell: bash
         run: |
           test_output=$(mktemp -d "$RUNNER_TEMP/app-sweep-ci.XXXXXX")
-          chmod 0777 "$test_output" # Ephemeral CI output, writable without DAC override.
-          docker run --rm --read-only --network none --cap-drop ALL --security-opt no-new-privileges \
+          docker run --rm --user "$(id -u):$(id -g)" --read-only --network none --cap-drop ALL --security-opt no-new-privileges \
             --cpus 2 --memory 4g --pids-limit 256 --tmpfs /tmp:rw,exec,size=1g \
-            --tmpfs /root/.cache:rw,exec,size=1g --tmpfs /root/.swiftpm:rw,size=128m \
+            --tmpfs "/root:rw,exec,size=1g,mode=700,uid=$(id -u),gid=$(id -g)" \
             --tmpfs /fixture-home:rw,exec,size=128m -e APP_SWEEP_FIXTURES=/fixture-home/task \
             --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/src,readonly" \
             --mount "type=bind,src=$test_output,dst=/out" -w /src \
@@ -27,4 +26,4 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Compile without launching the product
-        run: swift build -c release
+        run: swift build -c release -Xswiftc -disable-cmo
