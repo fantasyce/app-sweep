@@ -21,6 +21,7 @@ struct AppSweepApp: App {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var isRunningQA = false
 

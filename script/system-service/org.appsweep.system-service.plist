@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <key>Label</key><string>org.appsweep.system-service</string>
+    <key>ProgramArguments</key><array>
+        <string>/Library/Application Support/App Sweep/Service/AppSweepSystemService</string>
+    </array>
+    <key>UserName</key><string>root</string>
+    <key>GroupName</key><string>wheel</string>
+    <key>ProcessType</key><string>Standard</string>
+    <key>ThrottleInterval</key><integer>5</integer>
+    <key>Sockets</key><dict>
+        <key>Control</key><dict>
+            <key>SockPathName</key><string>/Library/Application Support/App Sweep/Service/control.sock</string>
+            <key>SockPathOwner</key><integer>0</integer>
+            <key>SockPathGroup</key><integer>0</integer>
+            <key>SockPathMode</key><integer>438</integer>
+            <key>SockType</key><string>stream</string>
+            <key>SockPassive</key><true/>
+        </dict>
+    </dict>
+</dict></plist>

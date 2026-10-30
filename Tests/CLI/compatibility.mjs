@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { spawnSync } from 'node:child_process';
+assert.equal(process.platform, 'linux', 'This test runs only in the isolated Linux container');
+assert.ok(fs.existsSync('/.dockerenv'));
+const binary = process.argv[2];
+const run = (...args) => spawnSync(binary, args, { encoding: 'utf8', timeout: 5000 });
+const app = '/root/Applications/Legacy Fixture.app';
+fs.mkdirSync(path.join(app, 'Contents'), { recursive: true });
+fs.writeFileSync(path.join(app, 'Contents/Info.plist'), `<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>org.example.legacy</string><key>CFBundleName</key><string>Legacy Fixture</string></dict></plist>`);
+assert.match(run('--version').stdout, /2\.0\.0/);
+for (const command of ['scan', 'uninstall', 'backup']) {
+  const result = run(command, app, '--execute', '--trash-confirm');
+  assert.equal(result.status, 0, result.stderr);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.schemaVersion, 1);
+  assert.equal(report.applicationPath, app);
+  assert.ok(report.platformLimitation);
+  assert.ok(fs.existsSync(app), 'Legacy execution flags must never move the app');
+}
+const orphan = run('uninstall-known', 'org.example.missing', 'Missing', '--execute');
+assert.equal(orphan.status, 0, orphan.stderr);
+assert.equal(JSON.parse(orphan.stdout).applicationPath ?? null, null);
+assert.notEqual(run('trash-path', '--path', app, '--execute').status, 0);
+assert.ok(fs.existsSync(app));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-report-'));
+const reportPath = path.join(root, 'legacy.json');
+fs.writeFileSync(reportPath, JSON.stringify({ detail: 'Backed up to /System/Library', candidates: [{ path: '/private/var/folders' }] }));
+assert.equal(run('preview-report', '--report', reportPath).status, 0);
+const fifoReport = path.join(root, 'fifo-report.json');
+assert.equal(spawnSync('/usr/bin/mkfifo', [fifoReport]).status, 0);
+const fifoResult = run('preview-report', '--report', fifoReport);
+assert.notEqual(fifoResult.status, null, 'A special-file report must be rejected rather than blocking');
+assert.notEqual(fifoResult.status, 0);
+assert.notEqual(run('restore', '--report', reportPath, '--execute').status, 0);
+console.log('CLI compatibility: legacy commands preview only; arbitrary deletion and free-text restoration refused.');

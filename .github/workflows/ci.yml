@@ -1,24 +1,29 @@
 name: CI
-
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-
+permissions:
+  contents: read
 jobs:
-  build-and-test:
-    runs-on: macos-15
-
+  portable-safety:
+    runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Show Swift version
-        run: swift --version
-
-      - name: Run CLI safety tests
-        run: ./script/test_cli.sh
-
-      - name: Build release binaries
+      - uses: actions/checkout@v7
+      - name: Portable core tests in isolated container
+        shell: bash
+        run: |
+          test_output=$(mktemp -d "$RUNNER_TEMP/app-sweep-ci.XXXXXX")
+          docker run --rm --read-only --network none --cap-drop ALL --security-opt no-new-privileges \
+            --cpus 2 --memory 4g --pids-limit 256 --tmpfs /tmp:rw,exec,size=1g \
+            --tmpfs /root/.cache:rw,exec,size=1g --tmpfs /root/.swiftpm:rw,size=128m \
+            --tmpfs /fixture-home:rw,exec,size=128m -e APP_SWEEP_FIXTURES=/fixture-home/task \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/src,readonly" \
+            --mount "type=bind,src=$test_output,dst=/out" -w /src \
+            swift:6.0.3-jammy swift test -j 2 --scratch-path /out/build
+  macos-compile-only:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Compile without launching the product
         run: swift build -c release

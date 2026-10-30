@@ -1,0 +1,95 @@
+import AppKit
+import SwiftUI
+import Darwin
+@testable import AppSweepCore
+#if !DEBUG
+#error("Disposable UI fixture must never ship")
+#endif
+private actor HarnessSystemFixture {
+    let scope: SystemCleanupScope
+    private var servers: [Task<Void,Never>] = []
+    private var counter: UInt8 = 1
+    var available = true
+    func setAvailable(_ value: Bool) { available = value }
+    let unexpectedCacheResult: Bool
+    init(scope: SystemCleanupScope,unexpectedCacheResult: Bool = false) { self.scope = scope; self.unexpectedCacheResult = unexpectedCacheResult }
+    func connect() async throws -> SystemServiceClient {
+        guard available else { throw SweepError.denied("界面夹具：系统组件暂不可用") }
+        let peer = AuthenticatedLocalPeer(uid:getuid(),pid:getpid(),auditToken:Data(repeating:4,count:32))
+        let nonce = Data(repeating:counter,count:32); counter &+= 1
+        let session = try SystemServiceSession.fixture(scope:scope,peer:peer,nonce:nonce)
+        var sockets: [Int32] = [-1,-1]
+        guard socketpair(AF_UNIX,SOCK_STREAM,0,&sockets) == 0 else { throw SweepError.filesystem("Coordinator socketpair") }
+        let serverSocket = sockets[0], clientSocket = sockets[1], unexpected = unexpectedCacheResult
+        servers.append(Task.detached {
+            defer { close(serverSocket) }
+            do {
+                try LocalControlChannel.write(SystemServiceReply.hello(nonce:nonce),socket:serverSocket)
+                for _ in 0..<32 {
+                    let request = try PrivilegedFrame.decode(await LocalControlChannel.readWhenReady(socket:serverSocket,deadline:ProcessInfo.processInfo.systemUptime + 60))
+                    var result = try await session.acceptFixture(request,peer:peer)
+                    if unexpected, case .execute = request.action, case .batch(var batch) = result,
+                       batch.entries.first?.original.category == .cache {
+                        // Fault at the reply boundary. Actual private recovery
+                        // data remains intact and must be inspected/restored.
+                        batch.status = .purged; result = .batch(batch)
+                    }
+                    let reply = try SystemServiceReply.prepare(result,for:request)
+                    for index in 0..<reply.partCount { try LocalControlChannel.write(reply.frame(at:index),socket:serverSocket) }
+                }
+            } catch { /* Closing on failure is the real protocol's indeterminate-result case. */ }
+        })
+        return try await SystemServiceClient.fixture(socket:clientSocket)
+    }
+    func finish() async { for server in servers { await server.value } }
+}
+
+@main
+@MainActor
+struct CoordinatorHarness: App {
+    @NSApplicationDelegateAdaptor(CoordinatorHarnessDelegate.self) private var delegate
+    @StateObject private var store: SweepStore
+    private let hub: HarnessSystemFixture
+    init() {
+        let home = CommandLine.arguments.dropFirst().first ?? ""
+        guard home.hasPrefix(NSHomeDirectory() + "/AppSweepAcceptanceGeneral-20261016/fixtures/"), UUID(uuidString:URL(fileURLWithPath:home).lastPathComponent) != nil else { fatalError("Requires owned disposable fixture home") }
+        do {
+            let library = home + "/MachineLibrary"
+            let id = try AppInspector.inspect(home + "/Applications/Network Fixture.app").bundleIdentifier
+            let log = library + "/Logs/" + id + "/old.log"
+            for path in [library + "/Caches/" + id + "/payload",log] {
+                try FileManager.default.createDirectory(atPath:URL(fileURLWithPath:path).deletingLastPathComponent().path,withIntermediateDirectories:true)
+                guard !FileManager.default.fileExists(atPath:path) else { continue }
+                try Data("Owned UI coordinator fixture".utf8).write(to:URL(fileURLWithPath:path),options:.withoutOverwriting)
+            }
+            try FileManager.default.setAttributes([.modificationDate:Date().addingTimeInterval(-45*86400)],ofItemAtPath:log)
+            let scope = try SystemCleanupScope.fixture(libraryRoot:library,applicationsRoot:home + "/Applications",userHome:home,requesterUID:getuid())
+            let hub = HarnessSystemFixture(scope:scope)
+            self.hub = hub
+            let policy = SafetyPolicy(home:home,acceptedPlatform:true,validatedRules:[ChosenApplicationRule.name,SelectedApplicationRule.name,CacheRule.name,CacheDomainRule.name,DeviceBackupRule.name,DeviceBackupRule.largeName,"signed-application-v1","cfpreferences-exact-domain-v1"])
+            let engine = SweepEngine(policy:policy,vaultPath:home + "/Library/Application Support/App Sweep/Recovery",fixture:false)
+            let coordinator = try CleanupCoordinator.fixture(engine:engine,systemFactory:{ try await hub.connect() })
+            let model = SweepStore(engine:engine,coordinator:coordinator)
+            model.applicationPickerRoot = URL(fileURLWithPath:home + "/Downloads")
+            model.executionAvailable = true
+            model.readOnlyReason = "隔离界面夹具：三个来源均限本任务资料，系统来源使用普通用户套接字，不代表实际 root 验收。"
+            _store = StateObject(wrappedValue:model)
+            SketchFont.register()
+        } catch { fatalError("Fixture setup failed: \(error)") }
+    }
+    var body: some Scene {
+        WindowGroup("App Sweep · 统一清理隔离验收") {
+            SweepWindow().environmentObject(store).font(SketchFont.body()).frame(minWidth:1000,minHeight:720)
+        }.commands {
+            CommandMenu("隔离验收") {
+                Button("三个来源可用") { Task { await hub.setAvailable(true); store.switchWorkspace(.junk); store.scan() } }
+                Button("系统来源不可用") { Task { await hub.setAvailable(false); store.switchWorkspace(.junk); store.scan() } }
+            }
+        }
+    }
+}
+@MainActor
+final class CoordinatorHarnessDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) { NSApp.setActivationPolicy(.regular); NSApp.activate(ignoringOtherApps:true) }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender:NSApplication) -> Bool { true }
+}

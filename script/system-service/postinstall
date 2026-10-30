@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+[ "$(/usr/bin/id -u)" = 0 ] || exit 77
+# Alternate target volumes have not passed the production path/volume contract.
+[ "${3:-}" = / ] || exit 64
+SCRIPT_ROOT=$(CDPATH= cd -- "$(/usr/bin/dirname -- "$0")" && pwd -P)
+exec "$SCRIPT_ROOT/AppSweepServiceInstaller" install "$SCRIPT_ROOT/Payload"
