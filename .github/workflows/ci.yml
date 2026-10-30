@@ -18,6 +18,7 @@ jobs:
             --cpus 2 --memory 4g --pids-limit 256 --tmpfs /tmp:rw,exec,size=1g \
             --tmpfs "/root:rw,exec,size=1g,mode=700,uid=$(id -u),gid=$(id -g)" \
             --tmpfs /fixture-home:rw,exec,size=128m -e APP_SWEEP_FIXTURES=/fixture-home/task \
+            -e HOME=/root -e XDG_CACHE_HOME=/root/.cache -e CLANG_MODULE_CACHE_PATH=/root/.cache/clang \
             --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/src,readonly" \
             --mount "type=bind,src=$test_output,dst=/out" -w /src \
             swift:6.0.3-jammy swift test -j 2 --scratch-path /out/build
@@ -26,4 +27,4 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Compile without launching the product
-        run: swift build -c release -Xswiftc -disable-cmo
+        run: swift build -c release

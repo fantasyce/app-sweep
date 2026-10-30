@@ -350,7 +350,7 @@ struct SweepWindow: View {
             OptimizationRecoverySection().environmentObject(store)
             if store.recoveryRows.isEmpty && store.optimizationHistory.isEmpty { Spacer(); Text(store.busy ? "正在读取恢复记录…" : "恢复区暂无已登记批次。").foregroundColor(palette.secondary).frame(maxWidth: .infinity); Spacer() }
             else if !store.recoveryRows.isEmpty {
-                List(selection: Binding(get:{ store.selectedBatch },set:store.selectRecovery)) {
+                List(selection: Binding(get:{ store.selectedBatch },set:{ store.selectRecovery($0) })) {
                     ForEach(store.recoveryRows) { row in
                         let batch = row.summary
                         VStack(alignment: .leading, spacing: 5) {
